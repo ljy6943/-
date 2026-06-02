@@ -1,213 +1,94 @@
 import streamlit as st
+from google import genai
+from google.genai import types
 
 # 페이지 설정
 st.set_page_config(
-    page_title="수행평가 알리미",
-    page_icon="📚",
-    layout="centered"
+    page_title="전자칠판 반장 알림봇",
+    page_icon="🖥️",
+    layout="wide"
 )
 
-# 제목
-st.title("📚 수행평가 알리미")
-st.write("학년과 과목을 선택하세요.")
+st.title("🖥️ 전자칠판 반장 알림봇")
+st.caption("반장의 말을 텍스트로 정리하여 전하는 전자칠판")
 
-# 수행평가 데이터
-tasks = {
+# API KEY 불러오기
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+    client = genai.Client(api_key=api_key)
 
-    "1학년": {
+except Exception:
+    st.error("❌ API 키를 불러오지 못했습니다. Secrets 설정을 확인하세요.")
+    st.stop()
 
-        "수학": {
-            "내용": "함수 발표",
-            "날짜": "6월 10일",
-            "준비물": "PPT"
-        },
+# 채팅 기록 유지
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-        "영어": {
-            "내용": "영어 에세이",
-            "날짜": "6월 15일",
-            "준비물": "A4 2장"
-        },
+# 이전 대화 표시
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-        "과학": {
-            "내용": "과학 실험 보고서",
-            "날짜": "6월 18일",
-            "준비물": "실험 사진"
-        },
+# 입력창
+user_input = st.chat_input("반장의 전달 내용을 입력하세요...")
 
-        "한국사": {
-            "내용": "역사 사건 조사",
-            "날짜": "6월 20일",
-            "준비물": "조사 자료"
-        },
+if user_input:
 
-        "국어": {
-            "내용": "독서 감상문",
-            "날짜": "6월 22일",
-            "준비물": "독서 노트"
-        },
+    # 사용자 메시지 저장
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
 
-        "사회": {
-            "내용": "환경 문제 발표",
-            "날짜": "6월 25일",
-            "준비물": "발표 자료"
-        },
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-        "체육": {
-            "내용": "배드민턴 실기",
-            "날짜": "6월 26일",
-            "준비물": "운동복"
-        },
+    try:
 
-        "미술": {
-            "내용": "풍경화 그리기",
-            "날짜": "6월 27일",
-            "준비물": "색연필"
-        },
+        # 시스템 프롬프트
+        system_prompt = """
+너는 학교 전자칠판 AI이다.
 
-        "음악": {
-            "내용": "리코더 연주",
-            "날짜": "6월 28일",
-            "준비물": "리코더"
-        }
-    },
+목표:
+반장의 말을 명확하고 보기 쉽게 텍스트 공지로 바꾼다.
 
-    "2학년": {
+규칙:
+- 핵심 내용을 정리한다.
+- 공지사항 형식으로 작성한다.
+- 중요 일정, 준비물, 과제는 강조한다.
+- 학생들이 쉽게 이해하도록 친절하게 작성한다.
+"""
 
-        "수학": {
-            "내용": "확률 문제 풀이",
-            "날짜": "6월 11일",
-            "준비물": "노트"
-        },
+        # Gemini 호출
+        response = client.models.generate_content(
+            model="gemini-2.5-flash-lite",
 
-        "영어": {
-            "내용": "영어 발표",
-            "날짜": "6월 16일",
-            "준비물": "PPT"
-        },
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=f"{system_prompt}\n\n반장 말:\n{user_input}")]
+                )
+            ]
+        )
 
-        "과학": {
-            "내용": "실험 보고서",
-            "날짜": "6월 20일",
-            "준비물": "실험 사진"
-        },
+        bot_reply = response.text
 
-        "한국사": {
-            "내용": "문화유산 조사",
-            "날짜": "6월 21일",
-            "준비물": "조사 자료"
-        },
+    except Exception as e:
+        bot_reply = f"""
+⚠️ 오류가 발생했습니다.
 
-        "국어": {
-            "내용": "시 분석",
-            "날짜": "6월 24일",
-            "준비물": "교과서"
-        },
+오류 내용:
+`{str(e)}`
 
-        "사회": {
-            "내용": "경제 발표",
-            "날짜": "6월 27일",
-            "준비물": "발표 자료"
-        },
+잠시 후 다시 시도해주세요.
+"""
 
-        "체육": {
-            "내용": "축구 실기",
-            "날짜": "6월 28일",
-            "준비물": "운동화"
-        },
+    # 응답 저장
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": bot_reply
+    })
 
-        "미술": {
-            "내용": "포스터 제작",
-            "날짜": "6월 29일",
-            "준비물": "도화지"
-        },
-
-        "음악": {
-            "내용": "합창 평가",
-            "날짜": "6월 30일",
-            "준비물": "악보"
-        }
-    },
-
-    "3학년": {
-
-        "수학": {
-            "내용": "미적분 발표",
-            "날짜": "6월 12일",
-            "준비물": "PPT"
-        },
-
-        "영어": {
-            "내용": "영어 토론",
-            "날짜": "6월 17일",
-            "준비물": "토론 자료"
-        },
-
-        "과학": {
-            "내용": "과학 탐구 보고서",
-            "날짜": "6월 23일",
-            "준비물": "탐구 자료"
-        },
-
-        "한국사": {
-            "내용": "근현대사 발표",
-            "날짜": "6월 26일",
-            "준비물": "발표 자료"
-        },
-
-        "국어": {
-            "내용": "문학 작품 분석",
-            "날짜": "6월 28일",
-            "준비물": "독서 노트"
-        },
-
-        "사회": {
-            "내용": "사회 문제 토론",
-            "날짜": "6월 30일",
-            "준비물": "토론 자료"
-        },
-
-        "체육": {
-            "내용": "농구 실기",
-            "날짜": "7월 1일",
-            "준비물": "운동복"
-        },
-
-        "미술": {
-            "내용": "디자인 제작",
-            "날짜": "7월 2일",
-            "준비물": "스케치북"
-        },
-
-        "음악": {
-            "내용": "가창 평가",
-            "날짜": "7월 3일",
-            "준비물": "악보"
-        }
-    }
-}
-
-# 학년 선택
-grade = st.selectbox(
-    "학년 선택",
-    list(tasks.keys())
-)
-
-# 과목 선택
-subject = st.selectbox(
-    "과목 선택",
-    list(tasks[grade].keys())
-)
-
-# 버튼
-if st.button("수행평가 확인하기"):
-
-    info = tasks[grade][subject]
-
-    st.subheader("📌 수행평가 정보")
-
-    st.write(f"**과목:** {subject}")
-    st.write(f"**내용:** {info['내용']}")
-    st.write(f"**날짜:** {info['날짜']}")
-    st.write(f"**준비물:** {info['준비물']}")
-
-    st.success("정상적으로 불러왔습니다!")
+    with st.chat_message("assistant"):
+        st.markdown(bot_reply)
