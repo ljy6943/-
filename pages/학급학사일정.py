@@ -1,267 +1,193 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import calendar
-import os
+from datetime import date
 
 st.set_page_config(
-    page_title="학급 학사일정 캘린더",
+    page_title="학급 학사일정",
     page_icon="📚",
     layout="wide"
 )
 
-DATA_FILE = "schedule_data.csv"
-
-# -----------------------------
-# 데이터 저장/불러오기 함수
-# -----------------------------
-def load_data():
-    try:
-        if os.path.exists(DATA_FILE):
-            return pd.read_csv(DATA_FILE)
-        else:
-            return pd.DataFrame(
-                columns=["date", "title", "category"]
-            )
-    except Exception:
-        return pd.DataFrame(
-            columns=["date", "title", "category"]
-        )
-
-def save_data(df):
-    try:
-        df.to_csv(DATA_FILE, index=False)
-    except Exception as e:
-        st.error(f"저장 오류: {e}")
-
-# -----------------------------
-# 데이터 로드
-# -----------------------------
-if "schedule_df" not in st.session_state:
-    st.session_state.schedule_df = load_data()
-
-df = st.session_state.schedule_df
-
-# -----------------------------
-# 제목
-# -----------------------------
-st.title("📚 학급 학사일정 캘린더")
-st.caption("시험, 수행평가, 과제, 학교행사를 한눈에 관리하세요.")
-
-# -----------------------------
-# 사이드바
-# -----------------------------
-with st.sidebar:
-    st.header("➕ 일정 추가")
-
-    selected_date = st.date_input(
-        "날짜 선택",
-        value=datetime.today()
-    )
-
-    title = st.text_input(
-        "일정 내용",
-        placeholder="예) 수학 수행평가"
-    )
-
-    category = st.selectbox(
-        "일정 종류",
-        [
-            "시험",
-            "수행평가",
-            "과제",
-            "학교행사",
-            "기타"
-        ]
-    )
-
-    if st.button("일정 저장"):
-        if title.strip() == "":
-            st.warning("일정 내용을 입력하세요.")
-        else:
-            new_row = pd.DataFrame(
-                [{
-                    "date": selected_date.strftime("%Y-%m-%d"),
-                    "title": title.strip(),
-                    "category": category
-                }]
-            )
-
-            st.session_state.schedule_df = pd.concat(
-                [st.session_state.schedule_df, new_row],
-                ignore_index=True
-            )
-
-            save_data(st.session_state.schedule_df)
-
-            st.success("일정이 저장되었습니다.")
-            st.rerun()
-
-    st.divider()
-
-    uploaded = st.file_uploader(
-        "CSV 불러오기",
-        type=["csv"]
-    )
-
-    if uploaded:
-        try:
-            imported_df = pd.read_csv(uploaded)
-
-            required_cols = {"date", "title", "category"}
-
-            if required_cols.issubset(imported_df.columns):
-                st.session_state.schedule_df = imported_df
-                save_data(imported_df)
-                st.success("불러오기 완료")
-            else:
-                st.error("올바른 CSV 파일이 아닙니다.")
-
-        except Exception as e:
-            st.error(f"불러오기 오류: {e}")
-
-# -----------------------------
-# 달력 설정
-# -----------------------------
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    year = st.number_input(
-        "연도",
-        min_value=2020,
-        max_value=2100,
-        value=datetime.today().year
-    )
-
-with col2:
-    month = st.selectbox(
-        "월",
-        list(range(1, 13)),
-        index=datetime.today().month - 1
-    )
-
-# -----------------------------
-# 카테고리 색상
-# -----------------------------
-category_colors = {
-    "시험": "#ffb3b3",
-    "수행평가": "#ffe0a3",
-    "과제": "#b3e6ff",
-    "학교행사": "#c8f7c5",
-    "기타": "#dddddd"
+# 연노랑 배경
+st.markdown("""
+<style>
+.stApp {
+    background-color: #FFF9C4;
 }
 
-# -----------------------------
-# 달력 생성
-# -----------------------------
-cal = calendar.monthcalendar(year, month)
+.calendar-table {
+    width:100%;
+    border-collapse:collapse;
+    text-align:center;
+}
 
-weekdays = ["월", "화", "수", "목", "금", "토", "일"]
+.calendar-table th {
+    background:#FFD54F;
+    padding:10px;
+    border:1px solid #999;
+}
 
-header_cols = st.columns(7)
+.calendar-table td {
+    height:110px;
+    vertical-align:top;
+    border:1px solid #999;
+    background:white;
+    padding:5px;
+}
 
-for idx, day in enumerate(weekdays):
-    header_cols[idx].markdown(
-        f"### {day}"
-    )
+.day-number{
+    font-weight:bold;
+    color:#333;
+}
 
-for week in cal:
-    cols = st.columns(7)
+.event{
+    margin-top:5px;
+    background:#FFF176;
+    border-radius:5px;
+    padding:3px;
+    font-size:13px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-    for i, day in enumerate(week):
+st.title("📚 우리 반 학사일정 캘린더")
 
-        if day == 0:
-            cols[i].write("")
-            continue
+# 세션 상태
+if "events" not in st.session_state:
+    st.session_state.events = {}
 
-        current_date = f"{year}-{month:02d}-{day:02d}"
+# 일정 추가
+with st.expander("➕ 일정 추가", expanded=True):
+    col1, col2 = st.columns([1, 3])
 
-        day_events = df[df["date"] == current_date]
-
-        html = f"""
-        <div style="
-            border:1px solid #cccccc;
-            border-radius:8px;
-            padding:5px;
-            min-height:140px;
-        ">
-        <b>{day}</b><br>
-        """
-
-        for _, row in day_events.iterrows():
-
-            color = category_colors.get(
-                row["category"],
-                "#dddddd"
-            )
-
-            html += f"""
-            <div style="
-                background:{color};
-                padding:3px;
-                margin-top:3px;
-                border-radius:5px;
-                font-size:12px;
-            ">
-            [{row['category']}]<br>
-            {row['title']}
-            </div>
-            """
-
-        html += "</div>"
-
-        cols[i].markdown(
-            html,
-            unsafe_allow_html=True
+    with col1:
+        selected_date = st.date_input(
+            "날짜 선택",
+            value=date.today()
         )
 
-# -----------------------------
-# 일정 목록
-# -----------------------------
+    with col2:
+        event_text = st.text_input("일정 내용")
+
+    if st.button("일정 추가"):
+        try:
+            if event_text.strip():
+                key = str(selected_date)
+
+                if key not in st.session_state.events:
+                    st.session_state.events[key] = []
+
+                st.session_state.events[key].append(event_text)
+
+                st.success("일정이 추가되었습니다.")
+            else:
+                st.warning("일정을 입력하세요.")
+        except Exception as e:
+            st.error(f"오류 발생: {e}")
+
+# 월 선택
+today = date.today()
+
+year = st.selectbox(
+    "연도",
+    list(range(today.year - 1, today.year + 5)),
+    index=1
+)
+
+month = st.selectbox(
+    "월",
+    list(range(1, 13)),
+    index=today.month - 1
+)
+
+st.subheader(f"📅 {year}년 {month}월")
+
+# 달력 생성
+cal = calendar.monthcalendar(year, month)
+
+html = """
+<table class='calendar-table'>
+<tr>
+<th>월</th>
+<th>화</th>
+<th>수</th>
+<th>목</th>
+<th>금</th>
+<th>토</th>
+<th>일</th>
+</tr>
+"""
+
+for week in cal:
+    html += "<tr>"
+
+    for day in week:
+        if day == 0:
+            html += "<td></td>"
+        else:
+            date_key = f"{year}-{month:02d}-{day:02d}"
+
+            event_html = ""
+
+            if date_key in st.session_state.events:
+                for e in st.session_state.events[date_key]:
+                    event_html += f"<div class='event'>{e}</div>"
+
+            html += f"""
+            <td>
+            <div class='day-number'>{day}</div>
+            {event_html}
+            </td>
+            """
+
+    html += "</tr>"
+
+html += "</table>"
+
+st.markdown(html, unsafe_allow_html=True)
+
 st.divider()
 
-st.subheader("📋 전체 일정")
+# 일정 목록
+st.subheader("📝 등록된 일정")
 
-if not df.empty:
+if st.session_state.events:
 
-    display_df = df.copy()
-    display_df.columns = [
-        "날짜",
-        "일정",
-        "종류"
-    ]
+    rows = []
+
+    for d, events in st.session_state.events.items():
+        for e in events:
+            rows.append([d, e])
+
+    df = pd.DataFrame(rows, columns=["날짜", "일정"])
 
     st.dataframe(
-        display_df.sort_values("날짜"),
+        df,
         use_container_width=True
     )
+
+    delete_date = st.selectbox(
+        "삭제할 날짜 선택",
+        sorted(st.session_state.events.keys())
+    )
+
+    if st.button("해당 날짜 일정 삭제"):
+        try:
+            del st.session_state.events[delete_date]
+            st.success("삭제 완료")
+            st.rerun()
+        except:
+            st.error("삭제 실패")
 
     csv = df.to_csv(index=False).encode("utf-8-sig")
 
     st.download_button(
-        "📥 CSV 다운로드",
-        data=csv,
-        file_name="class_schedule.csv",
+        "📥 일정 CSV 다운로드",
+        csv,
+        file_name="학사일정.csv",
         mime="text/csv"
     )
-
-    delete_idx = st.selectbox(
-        "삭제할 일정 선택",
-        range(len(df)),
-        format_func=lambda x:
-            f"{df.iloc[x]['date']} | {df.iloc[x]['title']}"
-    )
-
-    if st.button("🗑 일정 삭제"):
-        st.session_state.schedule_df = (
-            df.drop(index=delete_idx)
-            .reset_index(drop=True)
-        )
-
-        save_data(st.session_state.schedule_df)
-
-        st.success("삭제 완료")
-        st.rerun()
 
 else:
     st.info("등록된 일정이 없습니다.")
