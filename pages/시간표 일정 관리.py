@@ -82,3 +82,42 @@ with tab1:
     st.session_state.timetable = edited_df
     
     if st.button("시간표 초기화"):
+        st.session_state.timetable = pd.DataFrame("", index=[f"{h:02d}:00" for h in range(9, 19)], columns=["월요일", "화요일", "수요일", "목요일", "금요일"])
+        st.rerun()
+
+with tab2:
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.write("### 일정 추가")
+        new_task = st.text_input("무엇을 해야 하나요?", placeholder="예: 수학 과제 제출")
+        task_date = st.date_input("마감일")
+        if st.button("추가하기"):
+            if new_task:
+                st.session_state.todo_list.append({"task": new_task, "date": task_date, "done": False})
+                st.rerun()
+            else:
+                st.warning("내용을 입력해주세요.")
+                
+    with col2:
+        st.write("### To-do List")
+        if not st.session_state.todo_list:
+            st.write("등록된 일정이 없습니다. 사이드바의 AI 멘토에게 도움을 요청해보세요!")
+        else:
+            for i, item in enumerate(st.session_state.todo_list):
+                cols = st.columns([0.1, 0.6, 0.3])
+                # 체크박스로 완료 처리
+                is_done = cols[0].checkbox("", value=item['done'], key=f"check_{i}")
+                st.session_state.todo_list[i]['done'] = is_done
+                
+                # 가로선이나 취소선 대신 텍스트로 표시
+                task_text = f"~~{item['task']}~~" if is_done else item['task']
+                cols[1].markdown(f"{task_text} ({item['date']})")
+                
+                if cols[2].button("삭제", key=f"del_{i}"):
+                    st.session_state.todo_list.pop(i)
+                    st.rerun()
+
+# 하단 정보
+st.divider()
+st.caption(f"현재 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Sunny Schedule v1.0")
