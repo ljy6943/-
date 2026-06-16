@@ -1,94 +1,173 @@
 import streamlit as st
-from google import genai
-from google.genai import types
 
+# --------------------
 # 페이지 설정
+# --------------------
 st.set_page_config(
-    page_title="전자칠판 반장 알림봇",
-    page_icon="🖥️",
+    page_title="반장의 정보 도우미",
+    page_icon="📢",
     layout="wide"
 )
 
-st.title("🖥️ 전자칠판 반장 알림봇")
-st.caption("반장의 말을 텍스트로 정리하여 전하는 전자칠판")
+# --------------------
+# 스타일
+# --------------------
+st.markdown("""
+<style>
+.stApp{
+    background-color:#FFF176;
+}
 
-# API KEY 불러오기
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    client = genai.Client(api_key=api_key)
+.title{
+    text-align:center;
+    font-size:45px;
+    font-weight:bold;
+    color:black;
+    margin-bottom:10px;
+}
 
-except Exception:
-    st.error("❌ API 키를 불러오지 못했습니다. Secrets 설정을 확인하세요.")
-    st.stop()
+.notice-box{
+    background:white;
+    padding:15px;
+    border-radius:10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# 채팅 기록 유지
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# --------------------
+# 기본 데이터
+# --------------------
+if "notice" not in st.session_state:
+    st.session_state.notice = """
+📢 오늘의 공지
 
-# 이전 대화 표시
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# 입력창
-user_input = st.chat_input("반장의 전달 내용을 입력하세요...")
-
-if user_input:
-
-    # 사용자 메시지 저장
-    st.session_state.messages.append({
-        "role": "user",
-        "content": user_input
-    })
-
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    try:
-
-        # 시스템 프롬프트
-        system_prompt = """
-너는 학교 전자칠판 AI이다.
-
-목표:
-반장의 말을 명확하고 보기 쉽게 텍스트 공지로 바꾼다.
-
-규칙:
-- 핵심 내용을 정리한다.
-- 공지사항 형식으로 작성한다.
-- 중요 일정, 준비물, 과제는 강조한다.
-- 학생들이 쉽게 이해하도록 친절하게 작성한다.
+- 숙제 제출하기
+- 준비물 챙기기
+- 내일 체육복 입기
 """
 
-        # Gemini 호출
-        response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
+if "login" not in st.session_state:
+    st.session_state.login = False
 
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[types.Part(text=f"{system_prompt}\n\n반장 말:\n{user_input}")]
-                )
-            ]
+if "name" not in st.session_state:
+    st.session_state.name = ""
+
+# --------------------
+# 제목
+# --------------------
+st.markdown(
+    "<div class='title'>안 보면 니 손해</div>",
+    unsafe_allow_html=True
+)
+
+# --------------------
+# 로그인
+# --------------------
+if not st.session_state.login:
+
+    st.subheader("이름 입력")
+
+    name = st.text_input("이름")
+
+    if st.button("입장하기"):
+
+        if name.strip() == "":
+            st.warning("이름을 입력하세요.")
+        else:
+            st.session_state.login = True
+            st.session_state.name = name
+            st.rerun()
+
+# --------------------
+# 메인
+# --------------------
+else:
+
+    st.success(f"{st.session_state.name}님 환영합니다!")
+
+    page = st.sidebar.radio(
+        "페이지 선택",
+        [
+            "오늘의 공지",
+            "준비물 확인",
+            "학생 정보",
+            "반장 전용"
+        ]
+    )
+
+    # ----------------
+    # 공지
+    # ----------------
+    if page == "오늘의 공지":
+
+        st.header("📢 오늘의 공지")
+
+        st.markdown(
+            f"""
+            <div class="notice-box">
+            {st.session_state.notice}
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-        bot_reply = response.text
+    # ----------------
+    # 준비물
+    # ----------------
+    elif page == "준비물 확인":
 
-    except Exception as e:
-        bot_reply = f"""
-⚠️ 오류가 발생했습니다.
+        st.header("🎒 준비물")
 
-오류 내용:
-`{str(e)}`
+        st.write("✔ 필통")
+        st.write("✔ 교과서")
+        st.write("✔ 공책")
+        st.write("✔ 숙제")
 
-잠시 후 다시 시도해주세요.
-"""
+    # ----------------
+    # 학생 정보
+    # ----------------
+    elif page == "학생 정보":
 
-    # 응답 저장
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": bot_reply
-    })
+        st.header("🙋 학생 정보")
 
-    with st.chat_message("assistant"):
-        st.markdown(bot_reply)
+        st.write(f"이름 : {st.session_state.name}")
+
+    # ----------------
+    # 반장 전용
+    # ----------------
+    elif page == "반장 전용":
+
+        st.header("👑 반장 전용")
+
+        password = st.text_input(
+            "비밀번호 입력",
+            type="password"
+        )
+
+        if password == "classleader123":
+
+            st.success("반장 인증 완료")
+
+            new_notice = st.text_area(
+                "공지 작성",
+                value=st.session_state.notice,
+                height=250
+            )
+
+            if st.button("공지 저장"):
+
+                st.session_state.notice = new_notice
+
+                st.success("공지 저장 완료!")
+
+        elif password != "":
+            st.error("비밀번호가 틀렸습니다.")
+
+    st.sidebar.divider()
+
+    if st.sidebar.button("로그아웃"):
+
+        st.session_state.login = False
+        st.session_state.name = ""
+
+        st.rerun()
