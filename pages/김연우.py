@@ -1,99 +1,71 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
-import calendar
 
-st.set_page_config(page_title="학사일정 캘린더", page_icon="📚", layout="wide")
+st.set_page_config(
+    page_title="2026 학사일정",
+    page_icon="📚",
+    layout="wide"
+)
 
-# 기본 일정
+st.markdown("""
+<style>
+.stApp {
+    background-color: #FFF9D6;
+}
+</style>
+""", unsafe_allow_html=True)
 
-DEFAULT_EVENTS = [
-["2026-03-01", "삼일절", "공휴일"],
-["2026-03-03", "개학, 입학식", "학교행사"],
-["2026-03-24", "전국연합학력평가(1,2,3학년)", "시험"],
-["2026-04-22", "개교기념일", "학교행사"],
-["2026-05-07", "전국연합학력평가(3학년)", "시험"],
-["2026-07-21", "방학식", "학교행사"],
-["2026-08-19", "개학식", "학교행사"],
-["2026-10-20", "전국연합학력평가(1,2,3학년)", "시험"],
-["2026-11-19", "대학수학능력시험", "시험"],
-["2027-01-08", "종업식, 졸업식", "학교행사"],
+st.title("📚 2026 학사일정 캘린더")
+
+default_data = [
+    ["2026-03-01", "삼일절"],
+    ["2026-03-02", "대체공휴일(삼일절)"],
+    ["2026-03-03", "개학, 입학식"],
+    ["2026-03-24", "전국연합학력평가(1,2,3학년)"],
+    ["2026-03-26", "교육과정 설명회"],
+    ["2026-04-22", "개교기념일(오전수업)"],
+    ["2026-05-07", "전국연합학력평가(3학년)"],
+    ["2026-06-04", "대학수학능력시험 모의평가(3학년), 전국연합학력평가(1,2학년)"],
+    ["2026-07-08", "전국연합학력평가(3학년)"],
+    ["2026-07-21", "방학식"],
+    ["2026-08-19", "개학식"],
+    ["2026-09-02", "대학수학능력시험 모의평가(3학년), 전국연합학력평가(1,2학년)"],
+    ["2026-10-20", "전국연합학력평가(1,2,3학년)"],
+    ["2026-11-19", "대학수학능력시험"],
+    ["2027-01-01", "신정"],
+    ["2027-01-08", "종업식, 졸업식"]
 ]
 
-if "events" not in st.session_state:
-st.session_state.events = pd.DataFrame(
-DEFAULT_EVENTS,
-columns=["date", "title", "category"]
-)
+if "schedule" not in st.session_state:
+    st.session_state.schedule = pd.DataFrame(
+        default_data,
+        columns=["날짜", "일정"]
+    )
 
-st.title("📚 학급 학사일정 캘린더")
+st.sidebar.header("일정 추가")
 
-with st.sidebar:
-st.header("일정 추가")
+new_date = st.sidebar.date_input("날짜")
+new_event = st.sidebar.text_input("일정 내용")
 
-```
-new_date = st.date_input("날짜", value=date.today())
-new_title = st.text_input("일정명")
-new_category = st.selectbox(
-    "종류",
-    ["시험", "학교행사", "공휴일"]
-)
-
-if st.button("추가"):
-    if new_title.strip():
+if st.sidebar.button("추가"):
+    if new_event.strip():
         new_row = pd.DataFrame(
-            [[new_date.strftime("%Y-%m-%d"), new_title, new_category]],
-            columns=["date", "title", "category"]
+            [[str(new_date), new_event]],
+            columns=["날짜", "일정"]
         )
 
-        st.session_state.events = pd.concat(
-            [st.session_state.events, new_row],
+        st.session_state.schedule = pd.concat(
+            [st.session_state.schedule, new_row],
             ignore_index=True
         )
-        st.success("일정이 추가되었습니다.")
-```
 
-year = st.selectbox("연도", [2026, 2027])
-month = st.selectbox("월", list(range(1, 13)), index=2)
+        st.sidebar.success("일정 추가 완료")
 
-colors = {
-"시험": "#ffcccc",
-"학교행사": "#ccffcc",
-"공휴일": "#cce5ff"
-}
-
-weeks = calendar.monthcalendar(year, month)
-
-for week in weeks:
-cols = st.columns(7)
-
-```
-for i, day in enumerate(week):
-    if day == 0:
-        cols[i].write("")
-        continue
-
-    current_date = f"{year}-{month:02d}-{day:02d}"
-
-    events = st.session_state.events[
-        st.session_state.events["date"] == current_date
-    ]
-
-    html = f"<b>{day}</b><br>"
-
-    for _, row in events.iterrows():
-        html += (
-            f"<div style='background:{colors[row['category']]};"
-            f"padding:4px;margin:2px;border-radius:5px;'>"
-            f"{row['title']}</div>"
-        )
-
-    cols[i].markdown(html, unsafe_allow_html=True)
-```
-
-st.subheader("전체 일정")
+st.subheader("📅 학사일정")
 
 st.dataframe(
-st.session_state.events.sort_values("date"),
-use_container_width=True
+    st.session_state.schedule.sort_values("날짜"),
+    use_container_width=True
 )
+
+st.info("사이드바에서 새로운 일정을 추가할 수 있습니다.")
