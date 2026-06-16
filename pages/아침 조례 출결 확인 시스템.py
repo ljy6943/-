@@ -110,4 +110,38 @@ with main_col:
             "확인 시간": ["-"] * len(INITIAL_STUDENTS),
             "비고(사유)": [""] * len(INITIAL_STUDENTS)
         })
-        st.warning("출결
+        st.warning("출결 현황이 모두 초기화되었습니다.")
+        safe_rerun()
+
+st.markdown("---")
+
+# --- [선택] AI 사유 브리핑 기능 ---
+st.header("🤖 AI 오늘의 출결 요약 브리핑")
+
+if has_api_key:
+    issue_df = df[df["출결 상태"].isin(["지각", "결석"])]
+    
+    if len(issue_df) > 0:
+        if st.button("✨ AI 브리핑 생성하기"):
+            with st.spinner("AI가 오늘의 특이사항을 분석 중입니다..."):
+                try:
+                    summary_text = ""
+                    for _, row in issue_df.iterrows():
+                        summary_text += f"- {row['이름']} ({row['출결 상태']}): {row['비고(사유)'] if row['비고(사유)'] else '사유 미기재'}\n"
+                    
+                    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+                    prompt = f"""
+                    당신은 학급의 담임선생님을 돕는 AI 비서입니다. 
+                    아래의 학생들의 지각 및 결석 명단을 바탕으로, 오늘 학급의 출결 특이사항을 담임선생님께 보고하듯 다정하고 깔끔하게 2~3문장으로 요약해 주세요.
+                    
+                    [명단]
+                    {summary_text}
+                    """
+                    response = model.generate_content(prompt)
+                    st.info(response.text)
+                except Exception as e:
+                    st.error(f"AI 요약 중 오류가 발생했습니다: {e}")
+    else:
+        st.write("모든 학생이 출석했거나 특이사항(지각/결석)이 없어 AI 브리핑이 필요하지 않습니다. 🎉")
+else:
+    st.warning("⚠️ AI 요약 기능을 사용하려면 Streamlit Cloud의 Secrets에 'GEMINI_API_KEY'를 등록해 주세요. (현재는 비활성화 상태이며 기본 출결 기능은 정상 작동합니다.)")
