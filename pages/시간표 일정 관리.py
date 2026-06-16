@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
 from datetime import datetime
 
-# 1. 페이지 설정 및 배경색 테마 적용 (연한 노란색)
-st.set_page_config(page_title="Sunny Schedule", page_icon="☀️", layout="wide")
+# 1. 페이지 설정
+st.set_page_config(page_title="1-7 정보 도우미", page_icon="🏫", layout="wide")
 
-# CSS를 이용한 배경색 변경 및 UI 스타일링
+# 2. 연한 노란색 바탕 및 커스텀 스타일 지정을 위한 CSS 주입
 st.markdown("""
     <style>
     .stApp {
@@ -16,108 +15,65 @@ st.markdown("""
         background-color: #FFFDE7;
     }
     h1, h2, h3 {
-        color: #FBC02D;
+        color: #F57F17; /* 진한 주황/노란색 계열 포인트 */
     }
     .stButton>button {
         background-color: #FBC02D;
         color: white;
-        border-radius: 10px;
+        border-radius: 8px;
+    }
+    .css-1r6slb0 {
+        background-color: #FFF9C4;
     }
     </style>
     """, unsafe_allow_stdio=True)
 
-# 2. 세션 상태 초기화 (데이터 보존)
-if 'timetable' not in st.session_state:
-    # 기본 시간표 데이터 생성
-    hours = [f"{h:02d}:00" for h in range(9, 19)]
+# 3. 세션 상태 데이터 초기화 (기본 시간표 및 변경 사항 저장)
+if 'base_timetable' not in st.session_state:
+    # 1학년 7반 표준 고정 시간표 예시 데이터
+    periods = [f"{i}교시" for i in range(1, 8)]
     days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
-    st.session_state.timetable = pd.DataFrame("", index=hours, columns=days)
+    data = {
+        "월요일": ["국어", "수학", "영어", "과학", "체육", "미술", "미술"],
+        "화요일": ["사회", "역사", "수학", "국어", "영어", "음악", "동아리"],
+        "수요일": ["과학", "영어", "국어", "수학", "창체", "", ""],
+        "목요일": ["수학", "과학", "사회", "영어", "기술가정", "기술가정", "진로"],
+        "금요일": ["영어", "국어", "체육", "한문", "과학", "수학", "자치"]
+    }
+    st.session_state.base_timetable = pd.DataFrame(data, index=periods)
 
-if 'todo_list' not in st.session_state:
-    st.session_state.todo_list = []
+if 'changed_schedule' not in st.session_state:
+    # 당일 변경된 시간표를 저장할 딕셔너리 (예: {"월요일": {"1교시": "자습 (대체)"}})
+    st.session_state.changed_schedule = {}
 
-# 3. 사이드바 - AI 학습 멘토 기능
-with st.sidebar:
-    st.header("🤖 AI 학습 멘토")
-    if "GEMINI_API_KEY" in st.secrets:
-        try:
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            model = genai.GenerativeModel('gemini-2.5-flash-lite')
-            
-            if st.button("AI 스케줄 분석받기"):
-                with st.spinner("AI가 일정을 분석 중입니다..."):
-                    # 데이터 요약
-                    sched_data = st.session_state.timetable.to_string()
-                    todo_data = ", ".join([t['task'] for t in st.session_state.todo_list])
-                    
-                    prompt = f"""
-                    다음은 학생의 주간 시간표와 할 일 목록이야.
-                    시간표: {sched_data}
-                    할 일: {todo_data}
-                    
-                    이 일정을 보고 1. 가장 바쁜 날 분석 2. 효율적인 공부 시간 추천 3. 짧은 응원 메시지를 한국어로 친절하게 말해줘.
-                    """
-                    response = model.generate_content(prompt)
-                    st.success("분석 완료!")
-                    st.info(response.text)
-        except Exception as e:
-            st.error(f"AI 호출 중 오류가 발생했습니다: {e}")
-    else:
-        st.warning("Secrets에 GEMINI_API_KEY를 설정해주세요.")
+if 'notices' not in st.session_state:
+    st.session_state.notices = ["우유 급식 신청서 내일까지 제출", "내일 체육복 지참"]
 
-# 4. 메인 화면 구성
-st.title("☀️ Sunny Schedule")
-st.subheader("나만의 스마트 시간표 & 일정 관리")
-
-tab1, tab2 = st.tabs(["📅 주간 시간표", "📝 할 일 목록"])
-
-with tab1:
-    st.write("💡 아래 표를 클릭하여 직접 과목명을 입력하세요. (자동 저장됩니다)")
-    # Data Editor를 활용한 시간표 관리
-    edited_df = st.data_editor(
-        st.session_state.timetable,
-        use_container_width=True,
-        num_rows="fixed"
-    )
-    st.session_state.timetable = edited_df
-    
-    if st.button("시간표 초기화"):
-        st.session_state.timetable = pd.DataFrame("", index=[f"{h:02d}:00" for h in range(9, 19)], columns=["월요일", "화요일", "수요일", "목요일", "금요일"])
-        st.rerun()
-
-with tab2:
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.write("### 일정 추가")
-        new_task = st.text_input("무엇을 해야 하나요?", placeholder="예: 수학 과제 제출")
-        task_date = st.date_input("마감일")
-        if st.button("추가하기"):
-            if new_task:
-                st.session_state.todo_list.append({"task": new_task, "date": task_date, "done": False})
-                st.rerun()
-            else:
-                st.warning("내용을 입력해주세요.")
-                
-    with col2:
-        st.write("### To-do List")
-        if not st.session_state.todo_list:
-            st.write("등록된 일정이 없습니다. 사이드바의 AI 멘토에게 도움을 요청해보세요!")
-        else:
-            for i, item in enumerate(st.session_state.todo_list):
-                cols = st.columns([0.1, 0.6, 0.3])
-                # 체크박스로 완료 처리
-                is_done = cols[0].checkbox("", value=item['done'], key=f"check_{i}")
-                st.session_state.todo_list[i]['done'] = is_done
-                
-                # 가로선이나 취소선 대신 텍스트로 표시
-                task_text = f"~~{item['task']}~~" if is_done else item['task']
-                cols[1].markdown(f"{task_text} ({item['date']})")
-                
-                if cols[2].button("삭제", key=f"del_{i}"):
-                    st.session_state.todo_list.pop(i)
-                    st.rerun()
-
-# 하단 정보
+# 4. 헤더 영역
+st.title("🏫 1학년 7반 스마트 정보 도우미")
+st.markdown(f"**현재 일시:** {datetime.now().strftime('%Y년 %m월 %d일')} | 우리 반의 실시간 시간표와 공지사항을 확인하세요.")
 st.divider()
-st.caption(f"현재 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Sunny Schedule v1.0")
+
+# 5. 메인 레이아웃 분할 (좌측: 시간표 및 변경 확인 / 우측: 알림 및 관리자 기능)
+col1, col2 = st.columns([3, 2])
+
+with col1:
+    st.subheader("📅 주간 기본 시간표")
+    
+    # 디스플레이용 데이터프레임 복사
+    display_timetable = st.session_state.base_timetable.copy()
+    
+    # 변경된 시간표가 있다면 기존 시간표 위에 표시 및 강조 기호 추가
+    has_changes = False
+    if st.session_state.changed_schedule:
+        for day, changes in st.session_state.changed_schedule.items():
+            for period, new_subject in changes.items():
+                if new_subject.strip():
+                    display_timetable.at[period, day] = f"🔄 {new_subject}"
+                    has_changes = True
+
+    # 시간표 렌더링
+    st.dataframe(display_timetable, use_container_width=True, height=290)
+    
+    # 변경 사항 알림 배너
+    if has_changes:
